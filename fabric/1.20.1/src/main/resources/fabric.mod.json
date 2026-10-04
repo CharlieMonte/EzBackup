@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "id": "${mod_id}",
+  "version": "${mod_version}",
+  "name": "${mod_name}",
+  "description": "Creates compressed, lossless backups of the current world with /backup create <name> [zip|zstd] [level], and restores them in place. Players who join your world do not need this mod.",
+  "authors": ["EzBackup"],
+  "license": "GPL-3.0-only",
+  "environment": "*",
+  "entrypoints": {
+    "main": ["com.ezbackup.EzBackup"],
+    "client": ["com.ezbackup.client.EzBackupClient"]
+  },
+  "depends": {
+    "fabricloader": "${loader_version_range}",
+    "minecraft": "${minecraft_version_range}",
+    "java": ">=${java_version}",
+    "fabric-api": "*"
+  }
+}

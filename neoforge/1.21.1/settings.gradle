@@ -1,0 +1,12 @@
+// The ModDevGradle (NeoForge's Gradle plugin) version comes from gradle.properties (moddevgradle_version).
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        maven { url = 'https://maven.neoforged.net/releases' }
+    }
+    plugins {
+        id 'net.neoforged.moddev' version moddevgradle_version
+    }
+}
+
+rootProject.name = 'EzBackup'

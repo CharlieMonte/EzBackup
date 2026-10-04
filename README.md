@@ -1,14 +1,23 @@
 # EzBackup
 
-**Reliable, lossless world backups and in-place restores for Minecraft 1.18.2 + Forge.**
+**Reliable, lossless world backups and in-place restores for Minecraft, on Forge, Fabric and NeoForge.**
 
 EzBackup allows users to creates compressed, verified backups of your Minecraft world and provides tools to restore them without disconnecting players.
 
 Backups use standard **ZIP** or **Zstandard (`.tar.zst`)** archives, so your worlds are never locked into a proprietary backup format.
 
-> **Minecraft:** 1.18.2
-> **Mod Loader:** Forge 40.x
-> **Java:** 17
+## Supported versions
+
+Each version is its own Gradle project in its own folder. They share the same backup, archive, restore and GUI code; only the loader-specific parts differ.
+
+| Folder | Minecraft | Mod loader | Java |
+| ------ | --------- | ---------- | ---- |
+| `forge/1.18.2/` | 1.18.2 | Forge 40.x | 17 |
+| `forge/1.20.1/` | 1.20.1 | Forge 47.x | 17 |
+| `fabric/1.20.1/` | 1.20.1 | Fabric Loader 0.15.11+ and Fabric API 0.92.2+ | 17 |
+| `neoforge/1.21.1/` | 1.21.1 | NeoForge 21.1.x | 21 |
+
+> The Fabric and NeoForge ports were written without being able to compile them. Treat the first build as the test, and test `/backup restore` first.
 
 ## Features
 
@@ -136,7 +145,7 @@ World-wide state such as the following is also restored:
 
 ### What is not restored?
 
-Some settings belong to the Minecraft/Forge installation rather than the world save and are intentionally left alone:
+Some settings belong to the Minecraft installation rather than the world save and are intentionally left alone:
 
 * Game rules
 * Difficulty
@@ -194,11 +203,9 @@ Invalid values are ignored and replaced with their defaults.
 
 ## Installation
 
-1. Install **Minecraft 1.18.2**.
-2. Install **Forge 40.x**.
-3. Download the EzBackup `.jar`.
-4. Place it in your `mods` folder.
-5. Launch Minecraft.
+1. Install the Minecraft version and mod loader that match the jar you built (see *Supported versions*). Fabric also needs **Fabric API**.
+2. Place the EzBackup `.jar` in your `mods` folder.
+3. Launch Minecraft.
 
 Only the player hosting the world needs EzBackup installed. Players joining through single-player LAN or services such as e4mc do not need the mod on their own clients.
 
@@ -206,11 +213,10 @@ Only the player hosting the world needs EzBackup installed. Players joining thro
 
 ### Requirements
 
-* JDK 17
-* Minecraft Forge 40.x
-* Gradle 7.6.x
+* The JDK listed for your version in *Supported versions* (`java_version` in its `gradle.properties`)
+* Gradle: 8.1 (Forge 1.20.1), 8.8 (Fabric), 8.10 (NeoForge); the version is set in each folder's `gradle/wrapper/gradle-wrapper.properties`
 
-On Windows, the included build script can be used:
+Open the folder of the version you want (for example `fabric/1.20.1/`). On Windows, the included build script can be used:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\build.ps1
@@ -232,7 +238,7 @@ The project also bundles the required `zstd-jni` library into the final mod jar.
 
 ## Project Structure
 
-The project is organized so that most Minecraft-version-specific code is isolated from the backup implementation.
+Each version folder is organized so that most Minecraft-version-specific code is isolated from the backup implementation.
 
 ```text
 src/
@@ -242,11 +248,11 @@ src/
 │   │       ├── client/          # Client GUI and input
 │   │       ├── Backup*.java     # Backup workflow
 │   │       ├── Restore*.java    # Restore workflow
-│   │       ├── McCompat.java    # Minecraft/Forge compatibility layer
+│   │       ├── McCompat.java    # Minecraft/loader compatibility layer
 │   │       ├── McWorldSwap.java # Version-sensitive restore internals
 │   │       └── ...
 │   └── resources/
-│       └── META-INF/
+│       └── META-INF/ or fabric.mod.json, pack.mcmeta
 └── test/
     └── java/
 ```
@@ -255,7 +261,7 @@ The main backup and archive code does not depend heavily on Minecraft internals,
 
 ## Porting to Other Minecraft Versions
 
-EzBackup is currently targeted at **Minecraft 1.18.2**.
+See *Supported versions* for what exists today.
 
 Most version-specific work is concentrated in:
 
@@ -273,11 +279,33 @@ When porting the mod, start with:
 gradle.properties
 ```
 
-and update the Minecraft, Forge, Java, ForgeGradle, and resource pack versions as appropriate.
+and update the Minecraft, loader, Java, build-plugin, and resource pack versions as appropriate.
+
+For reference, these are the changes between the versions in this repository.
+
+**Forge 1.18.2 to Forge 1.20.1**
+
+* **Build:** Forge 47, ForgeGradle 6, Gradle 8.1, resource pack format 15.
+* **`McCompat`:** `Component.literal(...)` instead of `TextComponent`, `sendSystemMessage` instead of `sendMessage`, and `sendSuccess` taking a supplier.
+* **`McWorldSwap`:** the dimension constructor takes a `LevelStem` and a `RandomSequences`, the Ender Dragon fight is a typed `EndDragonFight.Data`, and `Registry`/`WorldEvent`/`Entity.getLevel()` became `Registries`/`LevelEvent`/`level()`.
+* **`client/`:** `GuiGraphics` instead of `PoseStack`/`GuiComponent`, `Button.builder` instead of the `Button` constructor, `getX()`/`getY()` instead of `x`/`y`, `ScreenEvent.Init` and `ScreenEvent.MouseButtonPressed`, and commands sent through `connection.sendCommand`.
+
+**Forge 1.20.1 to Fabric 1.20.1**
+
+* **Build:** Fabric Loom 1.6 and Gradle 8.8 instead of ForgeGradle; `fabric.mod.json` instead of `mods.toml` and `pack.mcmeta`; the same official Mojang mappings, so no class or method had to be renamed.
+* **`EzBackup`:** a `ModInitializer` that registers Fabric API callbacks (`CommandRegistrationCallback`, `ServerLifecycleEvents`, `ServerTickEvents`) instead of Forge `@SubscribeEvent` handlers.
+* **`McCompat`:** the config folder and the mod version come from `FabricLoader`. The "server side only" flag is gone: Fabric servers do not require clients to have the same mods.
+* **`McWorldSwap`:** Fabric API's `ServerWorldEvents.LOAD/UNLOAD` and `ServerEntityWorldChangeEvents.AFTER_PLAYER_CHANGE_WORLD` replace the Forge events; Forge's cached dimension array does not exist on Fabric, so that workaround was removed; the command storage is found by its constructor because class names are obfuscated at runtime on Fabric.
+* **`client/`:** a `ClientModInitializer` (`EzBackupClient`) registers `ScreenEvents.AFTER_INIT` (adds the **B** button through `Screens.getButtons`) and `ScreenMouseEvents.allowMouseClick` (the disconnect warning). The screen classes themselves are unchanged.
+
+**Forge 1.20.1 to NeoForge 1.21.1**
+
+* **Build:** NeoForge 21.1, ModDevGradle 2 and Gradle 8.10 instead of ForgeGradle, Java 21, `neoforge.mods.toml` instead of `mods.toml`, resource pack format 34. NeoForge runs with Mojang names, so there is no re-obfuscation step.
+* **`EzBackup` / `McCompat`:** the packages are `net.neoforged.*`; the tick event is `ServerTickEvent.Post`; the "server side only" flag is gone (a client can join a server that has mods it lacks, as long as those mods register no network payloads).
+* **`McWorldSwap`:** `ResourceLocation.parse` instead of the constructor; `NbtIo` takes a `Path` and an `NbtAccounter`; the codec result is unwrapped without the removed `getOrThrow(boolean, ...)`; the saved dimension is read with `Level.RESOURCE_KEY_CODEC`; events are posted on `NeoForge.EVENT_BUS`.
+* **`client/`:** `mouseScrolled` has four parameters; `Screen.render` now draws the background itself, so the text that sits behind the widgets is drawn from a `renderBackground` override; `EditBox.tick()` no longer exists; the event handler uses `@EventBusSubscriber`.
 
 The archive and file-management layers are intentionally kept independent of Minecraft so they can remain largely unchanged between versions.
-
-Detailed porting notes and project-structure documentation can be found in the `docs/` directory.
 
 ## Send Suggestion
 
@@ -314,7 +342,8 @@ Bug reports, compatibility fixes, performance improvements, documentation update
 When reporting a problem, please include:
 
 * Minecraft version
-* Forge version
+* Mod loader (Forge, Fabric or NeoForge) and its version
+* Which folder of this repository you built from
 * EzBackup version
 * Operating system
 * Relevant error messages or logs
@@ -324,7 +353,7 @@ For restore-related bugs, include whether the failure occurred during extraction
 
 ## License
 
-See [`LICENSE.txt`](LICENSE.txt) for the full license.
+See [`LICENSE.txt`](LICENSE.txt) in this folder for the full license.
 
 ## Acknowledgements
 

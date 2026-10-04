@@ -1,0 +1,135 @@
+// Nothing version-specific is hardcoded here: every value comes from gradle.properties.
+
+buildscript {
+    repositories {
+        maven { url = 'https://maven.minecraftforge.net' }
+        mavenCentral()
+    }
+    dependencies {
+        classpath group: 'net.minecraftforge.gradle', name: 'ForgeGradle', version: forgegradle_version, changing: true
+    }
+}
+
+apply plugin: 'net.minecraftforge.gradle'
+apply plugin: 'eclipse'
+
+version = mod_version
+group = mod_group
+// File name format: EzBackup-<modloader>-mc<minecraft version>-<mod version>.jar. Example:
+// EzBackup-forge-mc1.20.1-1.0.0.jar
+base {
+    archivesName = "${mod_name}-${mod_loader}-mc${minecraft_version}"
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(java_version.toInteger())
+
+println "Java: ${System.getProperty 'java.version'}, JVM: ${System.getProperty 'java.vm.version'} (${System.getProperty 'java.vendor'}), Arch: ${System.getProperty 'os.arch'}"
+
+// Libraries that get copied INTO the mod jar (a plain "fat jar" - no Jar-in-Jar, no relocation,
+// because zstd-jni's native code is bound to its original package name).
+// Minecraft/Forge are deliberately NOT in this configuration, so they never end up in the jar.
+configurations {
+    shade
+    implementation.extendsFrom shade
+}
+
+minecraft {
+    mappings channel: 'official', version: minecraft_version
+
+    runs {
+        client {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            mods {
+                "${mod_id}" {
+                    source sourceSets.main
+                }
+            }
+        }
+        server {
+            workingDirectory project.file('run')
+            property 'forge.logging.markers', 'REGISTRIES'
+            property 'forge.logging.console.level', 'debug'
+            mods {
+                "${mod_id}" {
+                    source sourceSets.main
+                }
+            }
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven { url = 'https://maven.minecraftforge.net' }
+}
+
+dependencies {
+    minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+
+    shade "com.github.luben:zstd-jni:${zstd_jni_version}"
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+// Fills ${...} placeholders in mods.toml and pack.mcmeta from gradle.properties.
+def resourceProperties = [
+        mod_id                 : mod_id,
+        mod_name               : mod_name,
+        mod_version            : mod_version,
+        minecraft_version_range: minecraft_version_range,
+        forge_version_range    : forge_version_range,
+        loader_version_range   : loader_version_range,
+        pack_format            : pack_format,
+]
+processResources {
+    inputs.properties resourceProperties
+    filesMatching(['META-INF/mods.toml', 'pack.mcmeta']) {
+        expand resourceProperties
+    }
+}
+
+jar {
+    manifest {
+        attributes([
+            'Specification-Title'     : mod_id,
+            'Specification-Vendor'    : 'EzBackup',
+            'Specification-Version'   : '1',
+            'Implementation-Title'    : project.name,
+            'Implementation-Version'  : project.version,
+            'Implementation-Vendor'   : 'EzBackup',
+            'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
+        ])
+    }
+
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    // Copy the compression libraries (classes + native libraries + service files) into the mod jar.
+    from({ configurations.shade.collect { it.isDirectory() ? it : zipTree(it) } }) {
+        // A module-info.class would make Forge treat this jar as a different named module.
+        exclude 'module-info.class'
+        exclude 'META-INF/versions/**/module-info.class'
+        exclude 'META-INF/MANIFEST.MF'
+        exclude 'META-INF/*.SF'
+        exclude 'META-INF/*.DSA'
+        exclude 'META-INF/*.RSA'
+
+        // zstd-jni carries a native library for ~20 OS / CPU combinations. Keep only the ones that cover practically
+        // every player and server (Windows x64, macOS Apple Silicon + Intel, Linux x64 + ARM64) and drop the rest
+        // (FreeBSD, AIX, 32-bit, Windows ARM, ppc64, s390x, mips, riscv, loongarch ...). A whitelist, so it keeps
+        // working if a newer zstd-jni adds more folders. On a dropped platform zstd cannot load; zip still works.
+        eachFile { details ->
+            String path = details.relativePath.pathString
+            boolean nativeLibrary = path ==~ '^(win|windows|linux|darwin|mac|osx|freebsd|aix|solaris)/.*'
+            boolean wanted = path ==~ '^(win/amd64|linux/amd64|linux/aarch64|darwin/aarch64|darwin/x86_64)/.*'
+            if (nativeLibrary && !wanted) {
+                details.exclude()
+            }
+        }
+    }
+}
+
+jar.finalizedBy('reobfJar')

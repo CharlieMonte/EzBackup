@@ -1,0 +1,27 @@
+# Filled in by Gradle (processResources) from gradle.properties. Edit values THERE, not here.
+modLoader="javafml"
+loaderVersion="${loader_version_range}"
+license="GPLv3"
+
+[[mods]]
+modId="${mod_id}"
+version="${mod_version}"
+displayName="${mod_name}"
+description='''
+Creates compressed, lossless backups of the current world with /backup create <n> [zip|zstd] [level].
+Server-side only: players who join your world do not need this mod.
+'''
+
+[[dependencies.${mod_id}]]
+    modId="neoforge"
+    type="required"
+    versionRange="${neo_version_range}"
+    ordering="NONE"
+    side="BOTH"
+
+[[dependencies.${mod_id}]]
+    modId="minecraft"
+    type="required"
+    versionRange="${minecraft_version_range}"
+    ordering="NONE"
+    side="BOTH"

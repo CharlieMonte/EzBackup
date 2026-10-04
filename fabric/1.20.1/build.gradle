@@ -1,0 +1,108 @@
+// Nothing version-specific is hardcoded here: every value comes from gradle.properties.
+
+plugins {
+    id 'fabric-loom'
+    id 'eclipse'
+}
+
+version = mod_version
+group = mod_group
+// File name format: EzBackup-<modloader>-mc<minecraft version>-<mod version>.jar. Example:
+// EzBackup-fabric-mc1.20.1-1.0.0.jar
+base {
+    archivesName = "${mod_name}-${mod_loader}-mc${minecraft_version}"
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(java_version.toInteger())
+    withSourcesJar()
+}
+
+println "Java: ${System.getProperty 'java.version'}, JVM: ${System.getProperty 'java.vm.version'} (${System.getProperty 'java.vendor'}), Arch: ${System.getProperty 'os.arch'}"
+
+// Libraries that get copied INTO the mod jar (a plain "fat jar" - no Jar-in-Jar, no relocation,
+// because zstd-jni's native code is bound to its original package name).
+// Minecraft/Fabric are deliberately NOT in this configuration, so they never end up in the jar.
+configurations {
+    shade
+    implementation.extendsFrom shade
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:${minecraft_version}"
+    // Official Mojang names, the same names the Forge version of this mod is written against.
+    mappings loom.officialMojangMappings()
+    modImplementation "net.fabricmc:fabric-loader:${fabric_loader_version}"
+    modImplementation "net.fabricmc.fabric-api:fabric-api:${fabric_api_version}"
+
+    shade "com.github.luben:zstd-jni:${zstd_jni_version}"
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = java_version.toInteger()
+}
+
+// Fills ${...} placeholders in fabric.mod.json from gradle.properties.
+def resourceProperties = [
+        mod_id                 : mod_id,
+        mod_name               : mod_name,
+        mod_version            : mod_version,
+        minecraft_version_range: minecraft_version_range,
+        loader_version_range   : loader_version_range,
+        java_version           : java_version,
+]
+processResources {
+    inputs.properties resourceProperties
+    filesMatching('fabric.mod.json') {
+        expand resourceProperties
+    }
+}
+
+jar {
+    manifest {
+        attributes([
+            'Specification-Title'     : mod_id,
+            'Specification-Vendor'    : 'EzBackup',
+            'Specification-Version'   : '1',
+            'Implementation-Title'    : project.name,
+            'Implementation-Version'  : project.version,
+            'Implementation-Vendor'   : 'EzBackup',
+            'Implementation-Timestamp': new Date().format("yyyy-MM-dd'T'HH:mm:ssZ")
+        ])
+    }
+
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+
+    from(rootProject.file('../../LICENSE.txt')) {
+        rename { "${it}_${project.base.archivesName.get()}" }
+    }
+
+    // Copy the compression libraries (classes + native libraries + service files) into the mod jar.
+    // Loom's remapJar task then turns this jar into the final, installable one in build/libs.
+    from({ configurations.shade.collect { it.isDirectory() ? it : zipTree(it) } }) {
+        exclude 'module-info.class'
+        exclude 'META-INF/versions/**/module-info.class'
+        exclude 'META-INF/MANIFEST.MF'
+        exclude 'META-INF/*.SF'
+        exclude 'META-INF/*.DSA'
+        exclude 'META-INF/*.RSA'
+
+        // zstd-jni carries a native library for ~20 OS / CPU combinations. Keep only the ones that cover practically
+        // every player and server (Windows x64, macOS Apple Silicon + Intel, Linux x64 + ARM64) and drop the rest
+        // (FreeBSD, AIX, 32-bit, Windows ARM, ppc64, s390x, mips, riscv, loongarch ...). A whitelist, so it keeps
+        // working if a newer zstd-jni adds more folders. On a dropped platform zstd cannot load; zip still works.
+        eachFile { details ->
+            String path = details.relativePath.pathString
+            boolean nativeLibrary = path ==~ '^(win|windows|linux|darwin|mac|osx|freebsd|aix|solaris)/.*'
+            boolean wanted = path ==~ '^(win/amd64|linux/amd64|linux/aarch64|darwin/aarch64|darwin/x86_64)/.*'
+            if (nativeLibrary && !wanted) {
+                details.exclude()
+            }
+        }
+    }
+}
