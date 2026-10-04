@@ -2,7 +2,7 @@
 
 **Reliable, lossless world backups and in-place restores for Minecraft 1.18.2 + Forge.**
 
-EzBackup automatically creates compressed, verified backups of your Minecraft world and provides tools to restore them without disconnecting players.
+EzBackup allows users to creates compressed, verified backups of your Minecraft world and provides tools to restore them without disconnecting players.
 
 Backups use standard **ZIP** or **Zstandard (`.tar.zst`)** archives, so your worlds are never locked into a proprietary backup format.
 
