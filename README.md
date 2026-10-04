@@ -281,32 +281,6 @@ gradle.properties
 
 and update the Minecraft, loader, Java, build-plugin, and resource pack versions as appropriate.
 
-For reference, these are the changes between the versions in this repository.
-
-**Forge 1.18.2 to Forge 1.20.1**
-
-* **Build:** Forge 47, ForgeGradle 6, Gradle 8.1, resource pack format 15.
-* **`McCompat`:** `Component.literal(...)` instead of `TextComponent`, `sendSystemMessage` instead of `sendMessage`, and `sendSuccess` taking a supplier.
-* **`McWorldSwap`:** the dimension constructor takes a `LevelStem` and a `RandomSequences`, the Ender Dragon fight is a typed `EndDragonFight.Data`, and `Registry`/`WorldEvent`/`Entity.getLevel()` became `Registries`/`LevelEvent`/`level()`.
-* **`client/`:** `GuiGraphics` instead of `PoseStack`/`GuiComponent`, `Button.builder` instead of the `Button` constructor, `getX()`/`getY()` instead of `x`/`y`, `ScreenEvent.Init` and `ScreenEvent.MouseButtonPressed`, and commands sent through `connection.sendCommand`.
-
-**Forge 1.20.1 to Fabric 1.20.1**
-
-* **Build:** Fabric Loom 1.6 and Gradle 8.8 instead of ForgeGradle; `fabric.mod.json` instead of `mods.toml` and `pack.mcmeta`; the same official Mojang mappings, so no class or method had to be renamed.
-* **`EzBackup`:** a `ModInitializer` that registers Fabric API callbacks (`CommandRegistrationCallback`, `ServerLifecycleEvents`, `ServerTickEvents`) instead of Forge `@SubscribeEvent` handlers.
-* **`McCompat`:** the config folder and the mod version come from `FabricLoader`. The "server side only" flag is gone: Fabric servers do not require clients to have the same mods.
-* **`McWorldSwap`:** Fabric API's `ServerWorldEvents.LOAD/UNLOAD` and `ServerEntityWorldChangeEvents.AFTER_PLAYER_CHANGE_WORLD` replace the Forge events; Forge's cached dimension array does not exist on Fabric, so that workaround was removed; the command storage is found by its constructor because class names are obfuscated at runtime on Fabric.
-* **`client/`:** a `ClientModInitializer` (`EzBackupClient`) registers `ScreenEvents.AFTER_INIT` (adds the **B** button through `Screens.getButtons`) and `ScreenMouseEvents.allowMouseClick` (the disconnect warning). The screen classes themselves are unchanged.
-
-**Forge 1.20.1 to NeoForge 1.21.1**
-
-* **Build:** NeoForge 21.1, ModDevGradle 2 and Gradle 8.10 instead of ForgeGradle, Java 21, `neoforge.mods.toml` instead of `mods.toml`, resource pack format 34. NeoForge runs with Mojang names, so there is no re-obfuscation step.
-* **`EzBackup` / `McCompat`:** the packages are `net.neoforged.*`; the tick event is `ServerTickEvent.Post`; the "server side only" flag is gone (a client can join a server that has mods it lacks, as long as those mods register no network payloads).
-* **`McWorldSwap`:** `ResourceLocation.parse` instead of the constructor; `NbtIo` takes a `Path` and an `NbtAccounter`; the codec result is unwrapped without the removed `getOrThrow(boolean, ...)`; the saved dimension is read with `Level.RESOURCE_KEY_CODEC`; events are posted on `NeoForge.EVENT_BUS`.
-* **`client/`:** `mouseScrolled` has four parameters; `Screen.render` now draws the background itself, so the text that sits behind the widgets is drawn from a `renderBackground` override; `EditBox.tick()` no longer exists; the event handler uses `@EventBusSubscriber`.
-
-The archive and file-management layers are intentionally kept independent of Minecraft so they can remain largely unchanged between versions.
-
 ## Send Suggestion
 
 EzBackup includes an optional in-game **Send Suggestion** feature for submitting suggestions, bug reports, and other feedback.
@@ -357,6 +331,6 @@ See [`LICENSE.txt`](LICENSE.txt) in this folder for the full license.
 
 ## Acknowledgements
 
-EzBackup was developed with assistance from AI-based development tools, including Claude (Anthropic).
+EzBackup was developed with assistance from AI-based development tools, including Claude (Anthropic) and ChatGPT (OpenAI).
 
 The project is intentionally structured to keep the backup/archive implementation separate from Minecraft-specific code, making the project easier to understand, maintain, and port.
